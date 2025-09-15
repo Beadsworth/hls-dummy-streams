@@ -1,16 +1,17 @@
-name: Docker
+name: Docker Multi-Image CI
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ 'v*.*.*' ]
+    branches: ["main"]
+    tags: ["v*.*.*"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     types: [opened, synchronize, closed]
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE1_NAME: ${{ github.repository }}-generator
+  IMAGE2_NAME: ${{ github.repository }}-nginx
 
 jobs:
   build:
@@ -22,90 +23,89 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout repository
+      # 1. Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3.5.0
-        with:
-          cosign-release: 'v2.2.4'
-
+      # 2. Set up Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.0.0
+        uses: docker/setup-buildx-action@v3
 
-      - name: Log into Docker Hub
-        uses: docker/login-action@v3.0.0
+      # 3. Login to Docker Hub
+      - name: Docker Hub login
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5.0.0
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      # Determine tags
+      # 4. Determine image tags
       - name: Set image tags
         id: tags
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Temporary PR tag
             echo "PR_TAG=pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
-            echo "IMAGE_TAGS=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
+            echo "IMAGE1_TAG=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
           else
-            echo "IMAGE_TAGS=${{ steps.meta.outputs.tags }}" >> $GITHUB_ENV
-          fi
+            echo "IMAGE1_TAG=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest" >> $GITHUB_ENV
 
-      # Build and push Docker image
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v5.0.0
+      # 5. Build and push Image1
+      - name: Build and push Image1
+        uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./image1
           push: true
-          tags: ${{ env.IMAGE_TAGS }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.IMAGE1_TAG }}
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }}
           cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }},mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }},mode=max
 
-      # Sign Docker image (optional)
-      - name: Sign Docker image
+      # 6. Build and push Image2
+      - name: Build and push Image2
+        uses: docker/build-push-action@v5
+        with:
+          context: ./image2
+          push: true
+          tags: ${{ env.IMAGE2_TAG }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }},mode=max
+
+      # 7. Optional: sign images
+      - name: Sign Image1
         if: github.event_name != 'pull_request'
-        env:
-          TAGS: ${{ env.IMAGE_TAGS }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+        run: cosign sign --yes ${{ env.IMAGE1_TAG }}
 
+      - name: Sign Image2
+        if: github.event_name != 'pull_request'
+        run: cosign sign --yes ${{ env.IMAGE2_TAG }}
+
+  # Cleanup PR images
   cleanup:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
-      - name: Log into Docker Hub
-        uses: docker/login-action@v3.0.0
+      - name: Docker Hub login
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Delete temporary PR image
+      - name: Delete temporary PR Image1
         run: |
           PR_TAG=pr-${GITHUB_SHA::8}
-          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}:$PR_TAG
-          echo "Deleting Docker Hub image $IMAGE"
+          curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
+            "https://hub.docker.com/v2/repositories/${{ github.repository }}-image1/tags/$PR_TAG/"
 
-          # Docker Hub API delete
-          TOKEN=$(curl -s -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
-            "https://hub.docker.com/v2/repositories/${{ github.repository }}/tags/$PR_TAG/" | jq -r '.token')
-
-          if [ "$TOKEN" != "null" ]; then
-            curl -X DELETE -H "Authorization: JWT $TOKEN" \
-              "https://hub.docker.com/v2/repositories/${{ github.repository }}/tags/$PR_TAG/"
-            echo "Deleted $PR_TAG"
-          else
-            echo "Tag $PR_TAG not found or already deleted"
-          fi
+      - name: Delete temporary PR Image2
+        run: |
+          PR_TAG=pr-${GITHUB_SHA::8}
+          curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
+            "https://hub.docker.com/v2/repositories/${{ github.repository }}-image2/tags/$PR_TAG/"
