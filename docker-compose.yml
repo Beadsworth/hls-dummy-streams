@@ -1,0 +1,31 @@
+services:
+
+  hls-stream-gen:
+    build:
+      context: ./hls-stream-gen
+    volumes:
+      - hls-stream:/hls
+    environment:
+      - TZ=UTC
+
+  hls-stream-nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "8081:80"
+      - "8000:8000"
+    volumes:
+      - hls-stream:/hls:ro
+    environment:
+      - TZ=UTC
+    depends_on:
+      - hls-stream-gen
+    networks:
+      - dummy-stream
+
+volumes:
+  hls-stream:
+
+networks:
+  dummy-stream:
+    driver: bridge

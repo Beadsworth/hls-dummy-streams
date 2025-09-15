@@ -1,0 +1,168 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+jspm_packages/
+bower_components/
+web_modules/
+
+# Build / release output
+build/
+build/Release
+dist/
+downloads/
+out/
+.wheels/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+
+# Coverage / testing
+coverage/
+*.lcov
+.nyc_output
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Cache directories
+.grunt
+.parcel-cache
+.cache/
+.temp
+.docusaurus
+.fusebox/
+.rpt2_cache/
+.rts2_cache_*/
+.cyton_debug/
+
+# TypeScript / JS build
+*.tsbuildinfo
+*.tgz
+.lock-wscript
+
+# Package managers
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Config / caches
+.eslintcache
+.stylelintcache
+.yarn-integrity
+
+# dotenv environment variables
+.env
+.env.*
+.env.local
+
+# Framework outputs
+.next/
+.nuxt/
+.vuepress/dist
+.serverless/
+.dynamodb/
+docs/_build/
+doc/_build/
+.site/
+
+# Django / Flask
+local_settings.py
+db.sqlite3*
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Jupyter / IPython
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# Virtual environments
+.venv/
+venv*/
+ENV*/
+env.bak/
+venv.bak/
+.Python
+.python-version
+
+# Package managers
+Pipfile.lock
+poetry.lock
+pdm.lock
+__pypackages__/
+
+# Compiled Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Translations
+*.mo
+*.pot
+
+# Project settings
+.spyderproject
+.spyproject
+.ropeproject
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# VS Code
+.vscode/
+.vscode-test/
+
+# macOS
+.DS_Store
+
+# project specific ignores
+.secrets/
+loki-data/

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Unicast IPTV Stream Viewer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    .controls {
+      margin-bottom: 1rem;
+      max-width: 400px;
+    }
+    .control-group {
+      margin-bottom: 1rem;
+    }
+    .video-container {
+      display: block;
+      gap: 0;
+    }
+    .video-block {
+      margin-bottom: 1.5rem;
+    }
+    video {
+      width: 50%;
+      max-width: 320px;
+      height: auto;
+      display: block;
+      pointer-events: none;
+    }
+    #warning {
+      color: red;
+      font-weight: bold;
+      margin-top: 0.5rem;
+    }
+    #elapsed-time {
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    select, input, button {
+      font-size: 1rem;
+      margin-top: 0.3rem;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+    }
+    #custom-hostname-container, #custom-port-container {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>HLS Stream Viewer</h2>
+
+  <div class="controls">
+    <!-- Hostname -->
+    <div class="control-group">
+      <label for="hostname-select">Hostname:</label>
+      <select id="hostname-select" onchange="onHostnameChange()">
+        <option id="default-hostname-option" value="default">(Default) window.location.hostname</option>
+        <option value="custom">Custom...</option>
+      </select>
+    </div>
+
+    <div class="control-group" id="custom-hostname-container">
+      <label for="custom-hostname-input">Enter hostname:</label>
+      <input type="text" id="custom-hostname-input" placeholder="Type custom hostname here" />
+    </div>
+
+    <!-- Port -->
+    <div class="control-group">
+      <label for="port-select">Port:</label>
+      <select id="port-select" onchange="onPortChange()">
+        <option value="8081">hls-origin: 8081</option>
+        <option value="8080" selected>hls-cache: 8080</option>
+        <option value="custom">Custom...</option>
+      </select>
+    </div>
+
+    <div class="control-group" id="custom-port-container">
+      <label for="custom-port-input">Enter port:</label>
+      <input type="number" id="custom-port-input" placeholder="Type custom port here" min="1" max="65535" />
+    </div>
+
+    <!-- Resolution -->
+    <div class="control-group">
+      <label for="resolution">Resolution:</label>
+      <select id="resolution">
+        <option value="360p" selected>360p</option>
+        <!-- <option value="720p">720p</option> -->
+      </select>
+    </div>
+
+    <!-- Live Sync Duration Count -->
+    <div class="control-group">
+      <label for="sync-count">HLS buffer segment length (hls.liveSyncDurationCount):</label>
+      <input type="number" id="sync-count" min="3" max="20" value="3" />
+    </div>
+
+    <div class="control-group">
+      <button onclick="loadStreams()">Load Streams</button>
+    </div>
+
+    <!-- New Synchronize Button -->
+    <div class="control-group">
+      <button onclick="synchronizeVideos()" id="sync-button" disabled>Synchronize Videos</button>
+    </div>
+
+    <div id="warning"></div>
+    <div id="elapsed-time"></div>
+  </div>
+
+  <div class="video-container" id="video-container"></div>
+
+  <script src="js/hls.min.js"></script>
+  <script>
+    let activeHls = [];
+    let initializedCount = 0;
+    let videoElements = [];
+
+    const channels = [
+      'TEST_CHANNEL_A',
+      'TEST_CHANNEL_B',
+    ];
+
+    function onHostnameChange() {
+      const select = document.getElementById('hostname-select');
+      const customContainer = document.getElementById('custom-hostname-container');
+      if (select.value === 'custom') {
+        customContainer.style.display = 'block';
+      } else {
+        customContainer.style.display = 'none';
+      }
+    }
+
+    function onPortChange() {
+      const select = document.getElementById('port-select');
+      const customPortContainer = document.getElementById('custom-port-container');
+      if (select.value === 'custom') {
+        customPortContainer.style.display = 'block';
+      } else {
+        customPortContainer.style.display = 'none';
+      }
+    }
+
+    function getHlsHostname() {
+      const select = document.getElementById('hostname-select');
+      if (select.value === 'default') {
+        return window.location.hostname;
+      }
+      if (select.value === 'custom') {
+        const customInput = document.getElementById('custom-hostname-input').value.trim();
+        if (customInput) {
+          return customInput;
+        } else {
+          alert('Please enter a custom hostname.');
+          throw new Error('Custom hostname not provided');
+        }
+      }
+      return select.value;
+    }
+
+    function getHlsPort() {
+      const select = document.getElementById('port-select');
+      if (select.value === 'custom') {
+        const portInput = document.getElementById('custom-port-input').value.trim();
+        if (portInput && !isNaN(portInput) && +portInput > 0 && +portInput <= 65535) {
+          return portInput;
+        } else {
+          alert('Please enter a valid custom port number (1-65535).');
+          throw new Error('Invalid custom port');
+        }
+      }
+      return select.value;
+    }
+
+    function loadStreams() {
+      console.info("loading streams...");
+      const container = document.getElementById('video-container');
+      const elapsedDiv = document.getElementById('elapsed-time');
+      const warning = document.getElementById('warning');
+      const syncButton = document.getElementById('sync-button');
+      const resolution = document.getElementById('resolution').value;
+      const syncCountInput = document.getElementById('sync-count');
+      const liveSyncDurationCount = parseInt(syncCountInput.value) || 3;
+
+      elapsedDiv.textContent = '';
+      warning.textContent = '';
+      activeHls.forEach(hls => hls.destroy());
+      activeHls = [];
+      initializedCount = 0;
+      container.innerHTML = '';
+      videoElements = [];
+
+      syncButton.disabled = true; // disable sync button until streams load
+
+      let hls_hostname;
+      let hls_port;
+      try {
+        hls_hostname = getHlsHostname();
+        hls_port = getHlsPort();
+      } catch(e) {
+        // Don't proceed if no valid hostname or port
+        return;
+      }
+
+      const minBufferSeconds = 3 * 6; // minimum buffer seconds required before playback
+      const bufferedEnough = new Array(channels.length).fill(false);
+
+      for (let i = 0; i < channels.length; i++) {
+        const chan = channels[i];
+        const videoBlock = document.createElement('div');
+        videoBlock.className = 'video-block';
+
+        const title = document.createElement('h3');
+        title.textContent = chan;
+        videoBlock.appendChild(title);
+
+        const video = document.createElement('video');
+        video.channel = chan;
+        video.controls = true;
+        video.autoplay = false;  // disable autoplay
+        video.muted = true;
+        videoBlock.appendChild(video);
+        container.appendChild(videoBlock);
+        videoElements.push(video);
+
+        const streamUrl = `http://${hls_hostname}:${hls_port}/streams/${chan}/${resolution}.m3u8`;
+
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            liveSyncDurationCount: liveSyncDurationCount,           // Target position: N segments behind
+            liveMaxLatencyDurationCount: liveSyncDurationCount + 5, // Max segment latency before hls stream jumps ahead
+            liveDurationInfinity: false,                            // Needed for liveSyncDurationCount to take effect
+            maxBufferLength: 120,                                   // Ample buffer space (~60s)
+            backBufferLength: 120,                                  // Keeps enough history without GC-ing too early
+            startFragPrefetch: true,                                // Start downloading next segment slightly early
+            lowLatencyMode: false,                                  // Ensures predictable buffer size (not chasing low-latency)
+          });
+
+          hls.attachMedia(video);
+
+          hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+            hls.loadSource(streamUrl);
+          });
+
+          hls.on(Hls.Events.ERROR, function(event, data) {
+            console.error('HLS error:', data);
+            if (data.fatal) {
+              warning.textContent = `Stream error on channel ${chan}: ${data.type} - ${data.details}`;
+            }
+          });
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (!activeHls.includes(hls)) {
+              activeHls.push(hls);
+            }
+            initializedCount++;
+          });
+
+          // writes an info log on every playlist read
+          hls.on(Hls.Events.LEVEL_UPDATED, function (event, data) {
+            const liveEdge = data.details?.live || false;
+            if (liveEdge) {
+              console.info({
+                channel: chan,
+                latency: hls.latency.toFixed(2),
+                targetLatency: hls.targetLatency.toFixed(2),
+                liveSyncPosition: hls.liveSyncPosition.toFixed(2),
+              });
+            }
+          });
+
+          // synchonize videos once all buffers are filled
+          hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            const latency = hls.latency;           // current playback latency in seconds
+            const targetLatency = hls.targetLatency; // ideal latency (hls-configured)
+
+            if (latency >= targetLatency && !bufferedEnough[i]) {
+              bufferedEnough[i] = true;
+
+              if (bufferedEnough.every(Boolean)) {
+                syncButton.disabled = false;
+                console.info("All videos within target latency. Synchronizing...");
+                synchronizeVideos();
+              }
+            }
+          });
+
+        } else {
+          video.outerHTML = "<p>Your browser does not support HLS playback</p>";
+        }
+      }
+    }
+
+    function synchronizeVideos() {
+      if (videoElements.length === 0 || activeHls.length !== videoElements.length) return;
+
+      console.info("Synchronizing videos based on hls.targetLatency...");
+
+      // Get reference Hls instance and its live edge
+      const referenceHls = activeHls[0];
+      const referenceVideo = videoElements[0];
+      const seekable = referenceVideo.seekable;
+
+      if (seekable.length === 0) {
+        console.warn("Seekable range not available yet");
+        return;
+      }
+
+      // Use hls.liveSyncPosition as the target play point
+      const liveEdge = seekable.end(0);
+      const targetLatency = referenceHls.targetLatency || 18;  // fallback to 3*6s if undefined
+      const liveSyncPosition = referenceHls.liveSyncPosition;
+
+      console.info(`Target live position: ${liveSyncPosition.toFixed(2)}s (liveEdge: ${liveEdge.toFixed(2)}, targetLatency: ${targetLatency.toFixed(2)})`);
+
+      // Pause and seek all videos
+      for (let i = 0; i < videoElements.length; i++) {
+        const video = videoElements[i];
+        const hls = activeHls[i];
+
+        try {
+          video.pause();
+          video.currentTime = liveSyncPosition;
+          console.info(`Set ${video.channel} currentTime to ${liveSyncPosition.toFixed(2)}`);
+        } catch (e) {
+          console.warn(`Error seeking video ${i}:`, e);
+        }
+      }
+
+      // Play all videos simultaneously
+      Promise.all(videoElements.map(video => video.play().catch(e => {
+        console.warn('Play error:', e);
+      })));
+    }
+
+    function disableSyncButtonOnInputChange() {
+      const syncButton = document.getElementById('sync-button');
+      const inputs = document.querySelectorAll('input, select');
+
+      inputs.forEach(input => {
+        input.addEventListener('input', () => {
+          syncButton.disabled = true;
+        });
+        input.addEventListener('change', () => {
+          syncButton.disabled = true;
+        });
+      });
+    }
+
+    window.onload = () => {
+      const defaultOption = document.getElementById('default-hostname-option');
+      defaultOption.textContent = `(Default) ${window.location.hostname}`;
+
+      onHostnameChange();
+      onPortChange();
+      disableSyncButtonOnInputChange();
+    };
+  </script>
+</body>
+</html>
