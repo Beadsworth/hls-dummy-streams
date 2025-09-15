@@ -29,8 +29,6 @@ RUN create-hls-playlist.sh
 # -------- Stage 2: Copy generated HLS to final image --------
 FROM python:3.13-alpine3.21 AS hls-server
 
-RUN touch /tmp/test.txt
-
 # Copy only the generated HLS files from ffmpeg builder
 COPY --from=ffmpeg-builder /hls /hls
 
