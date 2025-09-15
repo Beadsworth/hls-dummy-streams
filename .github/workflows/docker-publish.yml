@@ -40,15 +40,20 @@ jobs:
 
       # 4. Determine image tags
       - name: Set image tags
-        id: tags
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR_TAG=pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
-            echo "IMAGE1_TAG=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
-            echo "IMAGE2_TAG=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:pr-${GITHUB_SHA::8}" >> $GITHUB_ENV
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            echo "PR_TAG=pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
           else
-            echo "IMAGE1_TAG=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest" >> $GITHUB_ENV
-            echo "IMAGE2_TAG=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest" >> $GITHUB_ENV
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:latest" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:latest" >> $GITHUB_ENV
+          fi
+        shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE1_NAME: ${{ env.IMAGE1_NAME }}
+          IMAGE2_NAME: ${{ env.IMAGE2_NAME }}
 
       # 5. Build and push Image1
       - name: Build and push Image1
@@ -100,12 +105,12 @@ jobs:
 
       - name: Delete temporary PR Image1
         run: |
-          PR_TAG=pr-${GITHUB_SHA::8}
+          PR_TAG=pr-${GITHUB_SHA:0:8}
           curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
             "https://hub.docker.com/v2/repositories/${{ github.repository }}-image1/tags/$PR_TAG/"
 
       - name: Delete temporary PR Image2
         run: |
-          PR_TAG=pr-${GITHUB_SHA::8}
+          PR_TAG=pr-${GITHUB_SHA:0:8}
           curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
             "https://hub.docker.com/v2/repositories/${{ github.repository }}-image2/tags/$PR_TAG/"
