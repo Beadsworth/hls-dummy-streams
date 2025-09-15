@@ -59,7 +59,7 @@ jobs:
       - name: Build and push Image1
         uses: docker/build-push-action@v5
         with:
-          context: ./image1
+          context: ./generator
           push: true
           tags: ${{ env.IMAGE1_TAG }}
           cache-from: |
@@ -73,7 +73,7 @@ jobs:
       - name: Build and push Image2
         uses: docker/build-push-action@v5
         with:
-          context: ./image2
+          context: ./nginx
           push: true
           tags: ${{ env.IMAGE2_TAG }}
           cache-from: |
