@@ -10,8 +10,8 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE1_NAME: ${{ github.repository }}-generator
-  IMAGE2_NAME: ${{ github.repository }}-nginx
+  IMAGE1_NAME: ${{ github.repository | lower }}-generator
+  IMAGE2_NAME: ${{ github.repository | lower }}-nginx
 
 jobs:
   build:
