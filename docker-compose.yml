@@ -1,6 +1,7 @@
 services:
 
   generator:
+    image: beadsworth/hls-dummy-streams-generator
     build:
       context: ./generator
     volumes:
@@ -9,6 +10,7 @@ services:
       - TZ=UTC
 
   nginx:
+    image: beadsworth/hls-dummy-streams-nginx
     build:
       context: ./nginx
     ports:
