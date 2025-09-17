@@ -49,7 +49,7 @@ COPY app /app
 # Use unbuffered output so logs stream immediately
 ENV PYTHONUNBUFFERED=1
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --retries=1 \
   CMD /app/healthcheck.sh
 
 # Run fetch script
