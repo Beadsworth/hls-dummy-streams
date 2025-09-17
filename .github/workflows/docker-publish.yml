@@ -27,27 +27,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Set up Docker Buildx
+      # 2. Set up QEMU for multi-arch
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      # 3. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Login to Docker Hub
+      # 4. Login to Docker Hub
       - name: Docker Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4. Determine image tags
+      # 5. Determine image tags
       - name: Set image tags
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "PR_TAG=pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-          else
+            PR_TAG=pr-${GITHUB_SHA:0:8}
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${PR_TAG}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${PR_TAG}" >> $GITHUB_ENV
+            echo "CACHE_PUSH=false" >> $GITHUB_ENV
+          elif [ "$GITHUB_REF_TYPE" = "branch" ] && [ "$GITHUB_REF_NAME" = "main" ]; then
             echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:latest" >> $GITHUB_ENV
             echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:latest" >> $GITHUB_ENV
+            echo "CACHE_PUSH=true" >> $GITHUB_ENV
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION_TAG=${GITHUB_REF_NAME}
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+            echo "CACHE_PUSH=false" >> $GITHUB_ENV
           fi
         shell: bash
         env:
@@ -55,47 +66,43 @@ jobs:
           IMAGE1_NAME: ${{ env.IMAGE1_NAME }}
           IMAGE2_NAME: ${{ env.IMAGE2_NAME }}
 
-      # 5. Build and push Image1
-      - name: Build and push Image1
+      # 6. Build and push Image1
+      - name: Build and push hls-dummy-streams-generator
         uses: docker/build-push-action@v5
         with:
           context: ./generator
           push: true
           tags: ${{ env.IMAGE1_TAG }}
+          platforms: linux/amd64,linux/arm64
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest,allow=missing
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }},allow=missing
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }},mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:cache,allow=missing
+          cache-to: ${{ env.CACHE_PUSH == 'true' && format('type=registry,ref={0}/{1}:cache,mode=max', env.REGISTRY, env.IMAGE1_NAME) || '' }}
 
-      # 6. Build and push Image2
-      - name: Build and push Image2
+      # 7. Build and push Image2
+      - name: Build and push hls-dummy-streams-nginx
         uses: docker/build-push-action@v5
         with:
           context: ./nginx
           push: true
           tags: ${{ env.IMAGE2_TAG }}
+          platforms: linux/amd64,linux/arm64
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest,allow=missing
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }},allow=missing
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }},mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:cache,allow=missing
+          cache-to: ${{ env.CACHE_PUSH == 'true' && format('type=registry,ref={0}/{1}:cache,mode=max', env.REGISTRY, env.IMAGE2_NAME) || '' }}
 
-      # 7. Install cosign (needed before signing)
+      # 8. Install cosign (needed before signing)
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.5.0
         with:
           cosign-release: 'v2.2.4'
 
-      # 8. Sign images
-      - name: Sign Image1
+      # 9. Sign images
+      - name: Sign hls-dummy-streams-generator
         if: github.event_name != 'pull_request'
         run: cosign sign --yes ${{ env.IMAGE1_TAG }}
 
-      - name: Sign Image2
+      - name: Sign hls-dummy-streams-nginx
         if: github.event_name != 'pull_request'
         run: cosign sign --yes ${{ env.IMAGE2_TAG }}
 
