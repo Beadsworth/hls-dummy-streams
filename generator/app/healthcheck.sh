@@ -3,11 +3,11 @@ DIR="/hls/streams"
 MAX_AGE=10
 STATUS=0
 
-# Find all m3u8 files
-FILES=$(find "$DIR" -type f -name "*.m3u8")
+# Find all variant playlists (.m3u8 but not master.m3u8)
+FILES=$(find "$DIR" -type f -name "*.m3u8" ! -name "index.m3u8")
 
 if [ -z "$FILES" ]; then
-    echo "No .m3u8 files found!"
+    echo "No variant .m3u8 files found!"
     exit 1
 fi
 
