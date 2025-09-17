@@ -42,10 +42,16 @@ jobs:
       - name: Set image tags
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            echo "PR_TAG=pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
-            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:pr-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
+            PR_TAG=pr-${GITHUB_SHA:0:8}
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${PR_TAG}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${PR_TAG}" >> $GITHUB_ENV
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # Use Git tag as version
+            VERSION_TAG=${GITHUB_REF_NAME}
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
           else
+            # fallback to latest for main branch pushes
             echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:latest" >> $GITHUB_ENV
             echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:latest" >> $GITHUB_ENV
           fi
