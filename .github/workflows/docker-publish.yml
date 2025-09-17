@@ -68,6 +68,7 @@ jobs:
           context: ./generator
           push: true
           tags: ${{ env.IMAGE1_TAG }}
+          platforms: linux/amd64,linux/arm64
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:cache,allow=missing
           cache-to: |
@@ -80,6 +81,7 @@ jobs:
           context: ./nginx
           push: true
           tags: ${{ env.IMAGE2_TAG }}
+          platforms: linux/amd64,linux/arm64
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:cache,allow=missing
           cache-to: |
