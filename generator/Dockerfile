@@ -49,5 +49,8 @@ COPY app /app
 # Use unbuffered output so logs stream immediately
 ENV PYTHONUNBUFFERED=1
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD /app/healthcheck.sh
+
 # Run fetch script
 ENTRYPOINT ["python3", "start_hls_streams.py"]

@@ -14,7 +14,7 @@ Key features of this project:
 
 Upcoming features wishlist:
 - multiple resolutions supported
-- better docke security
+- better docker security
 - statically host [hls.js demo page](https://hlsjs.video-dev.org/demo/) (it's a very good page!)
 
 
