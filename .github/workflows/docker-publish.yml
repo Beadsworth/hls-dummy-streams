@@ -63,8 +63,8 @@ jobs:
           push: true
           tags: ${{ env.IMAGE1_TAG }}
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest,allow=missing
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }},allow=missing
           cache-to: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:latest,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:${{ github.sha }},mode=max
@@ -77,13 +77,20 @@ jobs:
           push: true
           tags: ${{ env.IMAGE2_TAG }}
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }}
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest,allow=missing
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }},allow=missing
           cache-to: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:latest,mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:${{ github.sha }},mode=max
 
-      # 7. Optional: sign images
+      # 7. Install cosign (needed before signing)
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3.5.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      # 8. Sign images
       - name: Sign Image1
         if: github.event_name != 'pull_request'
         run: cosign sign --yes ${{ env.IMAGE1_TAG }}
@@ -107,10 +114,10 @@ jobs:
         run: |
           PR_TAG=pr-${GITHUB_SHA:0:8}
           curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
-            "https://hub.docker.com/v2/repositories/${{ github.repository }}-image1/tags/$PR_TAG/"
+            "https://hub.docker.com/v2/repositories/${{ env.IMAGE1_NAME }}/tags/$PR_TAG/"
 
       - name: Delete temporary PR Image2
         run: |
           PR_TAG=pr-${GITHUB_SHA:0:8}
           curl -s -X DELETE -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" \
-            "https://hub.docker.com/v2/repositories/${{ github.repository }}-image2/tags/$PR_TAG/"
+            "https://hub.docker.com/v2/repositories/${{ env.IMAGE2_NAME }}/tags/$PR_TAG/"
