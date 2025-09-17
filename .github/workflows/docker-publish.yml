@@ -27,21 +27,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Set up QEMU
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
-      # 2. Set up Docker Buildx
+      # 3. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Login to Docker Hub
+      # 4. Login to Docker Hub
       - name: Docker Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4. Determine image tags
+      # 5. Determine image tags
       - name: Set image tags
         run: |
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
@@ -64,8 +65,8 @@ jobs:
           IMAGE1_NAME: ${{ env.IMAGE1_NAME }}
           IMAGE2_NAME: ${{ env.IMAGE2_NAME }}
 
-      # 5. Build and push Image1
-      - name: Build and push Image1
+      # 6. Build and push Image1
+      - name: Build and push hls-dummy-streams-generator
         uses: docker/build-push-action@v5
         with:
           context: ./generator
@@ -77,8 +78,8 @@ jobs:
           cache-to: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE1_NAME }}:cache,mode=max
 
-      # 6. Build and push Image2
-      - name: Build and push Image2
+      # 7. Build and push Image2
+      - name: Build and push hls-dummy-streams-nginx
         uses: docker/build-push-action@v5
         with:
           context: ./nginx
@@ -90,19 +91,19 @@ jobs:
           cache-to: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE2_NAME }}:cache,mode=max
 
-      # 7. Install cosign (needed before signing)
+      # 8. Install cosign (needed before signing)
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.5.0
         with:
           cosign-release: 'v2.2.4'
 
-      # 8. Sign images
-      - name: Sign Image1
+      # 9. Sign images
+      - name: Sign hls-dummy-streams-generator
         if: github.event_name != 'pull_request'
         run: cosign sign --yes ${{ env.IMAGE1_TAG }}
 
-      - name: Sign Image2
+      - name: Sign hls-dummy-streams-nginx
         if: github.event_name != 'pull_request'
         run: cosign sign --yes ${{ env.IMAGE2_TAG }}
 
