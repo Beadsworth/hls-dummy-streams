@@ -45,15 +45,15 @@ jobs:
             PR_TAG=pr-${GITHUB_SHA:0:8}
             echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${PR_TAG}" >> $GITHUB_ENV
             echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${PR_TAG}" >> $GITHUB_ENV
+          elif [ "$GITHUB_REF_TYPE" = "branch" ] && [ "$GITHUB_REF_NAME" = "main" ]; then
+            # main branch push → latest
+            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:latest" >> $GITHUB_ENV
+            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:latest" >> $GITHUB_ENV
           elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            # Use Git tag as version
+            # Git tag push → use tag only
             VERSION_TAG=${GITHUB_REF_NAME}
             echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
             echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
-          else
-            # fallback to latest for main branch pushes
-            echo "IMAGE1_TAG=${REGISTRY}/${IMAGE1_NAME}:latest" >> $GITHUB_ENV
-            echo "IMAGE2_TAG=${REGISTRY}/${IMAGE2_NAME}:latest" >> $GITHUB_ENV
           fi
         shell: bash
         env:
