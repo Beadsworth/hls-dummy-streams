@@ -15,6 +15,8 @@ COPY ffmpeg/create-hls-playlist.sh /usr/local/bin/create-hls-playlist.sh
 # Copy index files into the container
 COPY stream-files/index.m3u8 /hls/streams-original/TEST_CHANNEL_A/index.m3u8
 COPY stream-files/index.m3u8 /hls/streams-original/TEST_CHANNEL_B/index.m3u8
+COPY stream-files/index.m3u8 /hls/streams/TEST_CHANNEL_A/index.m3u8
+COPY stream-files/index.m3u8 /hls/streams/TEST_CHANNEL_A/index.m3u8
 
 # Download the full Big Buck Bunny movie (4K 60fps)
 ADD https://download.blender.org/demo/movies/BBB/bbb_sunflower_2160p_30fps_normal.mp4.zip video.mp4.zip
