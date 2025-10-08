@@ -237,6 +237,8 @@ class HLSPlaylist:
     def clear_hls_dir(self):
         for pattern in ("*.ts", "*.m3u8"):
             for hls_file in self.output_dir.glob(pattern):
+                if hls_file.suffix == ".m3u8" and hls_file.name == "index.m3u8":
+                    continue
                 hls_file.unlink()
                 print(f"Deleted {hls_file}")
 
